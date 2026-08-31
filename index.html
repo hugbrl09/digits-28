@@ -5,25 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>digits-28 · reconhecimento de dígitos manuscritos</title>
 <meta name="description" content="Uma rede convolucional treinada no MNIST que reconhece dígitos manuscritos dentro do navegador, sem servidor." />
-<meta name="theme-color" content="#f6f4ef" />
+<meta name="theme-color" content="#efece4" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 
 <style>
+/* ═══════════════════════════ tokens ═══════════════════════════ */
 :root {
-  --papel:    #f6f4ef;
-  --carta:    #fffefb;
-  --tinta:    #1c1b18;
-  --tinta-2:  #6c685f;
-  --tinta-3:  #a09b90;
-  --regua:    #e4e0d6;
-  --trilho:   #eae6dc;
+  --plano:    #efece4;   /* fundo da página */
+  --carta:    #fffdf9;   /* superfície dos cards */
+  --recuo:    #f7f4ee;   /* superfície rebaixada dentro dos cards */
+  --tinta:    #1b1a17;
+  --tinta-2:  #6b675e;
+  --tinta-3:  #a19c91;
+  --regua:    #e0dbd0;
+  --regua-2:  #ebe6db;
   --acento:   #1f4b45;
+  --acento-eco: #e6efec;
+  --sombra:   0 1px 2px rgba(27,26,23,.04), 0 8px 24px -14px rgba(27,26,23,.22);
 }
 
 * { box-sizing: border-box; }
@@ -31,154 +35,225 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--papel);
+  background: var(--plano);
   color: var(--tinta);
   font: 400 15px/1.6 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
-  display: flex;
-  flex-direction: column;
 }
 
-.folha {
-  width: 100%;
-  max-width: 860px;
-  margin-inline: auto;
-  padding: 0 28px;
+/* trama fina do papel, atrás de tudo */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(27,26,23,.014) 0 1px, transparent 1px 5px);
 }
 
-/* ── cabeçalho ───────────────────────────────────────────── */
+.folha { width: 100%; max-width: 960px; margin-inline: auto; padding: 0 24px; }
+
+.mono {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.rotulo {
+  font: 500 10px/1 'JetBrains Mono', monospace;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--tinta-3);
+}
+
+/* ═══════════════════════════ cabeçalho ═══════════════════════════ */
 header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 14px;
-  padding: 34px 0 0;
+  padding: 30px 0 16px;
 }
-.marca {
-  font: 400 21px/1 'Instrument Serif', Georgia, serif;
-  letter-spacing: .01em;
-}
+.marca { font: 400 22px/1 'Instrument Serif', Georgia, serif; }
 .marca em { font-style: italic; color: var(--tinta-2); }
-.sub {
-  font-size: 13px;
-  color: var(--tinta-3);
+.legenda { font-size: 13px; color: var(--tinta-3); }
+
+.selo {
   margin-left: auto;
-  text-align: right;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border: 1px solid var(--regua);
+  border-radius: 999px;
+  background: var(--carta);
+  font-size: 12.5px;
+  color: var(--tinta-2);
+  white-space: nowrap;
 }
+.selo i {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--tinta-3);
+  transition: background .2s;
+}
+.selo[data-pronto="sim"] i { background: var(--acento); }
+.selo[data-pronto="erro"] i { background: #b4472f; }
 
-.risco { height: 1px; background: var(--regua); margin: 18px 0 34px; }
-
-/* ── mesa de trabalho ────────────────────────────────────── */
-main { flex: 1; }
-
+/* ═══════════════════════════ mesa ═══════════════════════════ */
 .mesa {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, .82fr);
-  gap: 44px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.02fr);
+  gap: 20px;
   align-items: start;
 }
 
-.chamada {
-  font: 400 17px/1.4 'Instrument Serif', Georgia, serif;
-  color: var(--tinta-2);
-  margin: 0 0 14px;
+.carta {
+  background: var(--carta);
+  border: 1px solid var(--regua);
+  border-radius: 10px;
+  box-shadow: var(--sombra);
 }
+.carta-topo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--regua-2);
+}
+.carta-corpo { padding: 16px; }
 
-/* prancheta ------------------------------------------------ */
+/* ── prancheta ── */
 .prancheta {
   position: relative;
   aspect-ratio: 1;
-  background: var(--carta);
-  border: 1px solid var(--regua);
-  border-radius: 3px;
+  background: var(--recuo);
+  border: 1px solid var(--regua-2);
+  border-radius: 7px;
+  overflow: hidden;
   touch-action: none;
   cursor: crosshair;
-  overflow: hidden;
 }
 #tela { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-
 .fantasma {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-content: center;
+  position: absolute; inset: 0;
+  display: grid; place-content: center; justify-items: center; gap: 8px;
   pointer-events: none;
-  font: 400 15px/1 'Inter', sans-serif;
   color: var(--tinta-3);
   transition: opacity .25s;
 }
+.fantasma svg { width: 26px; height: 26px; opacity: .65; }
+.fantasma span { font-size: 13px; }
 .prancheta[data-usada="sim"] .fantasma { opacity: 0; }
 
-.pe {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-top: 14px;
-}
+/* ── ferramentas ── */
+.ferramentas { display: flex; gap: 6px; margin-top: 14px; }
 
-.limpar {
+.bt {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 11px;
   border: 1px solid var(--regua);
+  border-radius: 7px;
   background: var(--carta);
   color: var(--tinta-2);
-  font: 500 13px/1 'Inter', sans-serif;
-  padding: 9px 15px;
-  border-radius: 3px;
+  font: 500 12.5px/1 'Inter', sans-serif;
   cursor: pointer;
-  transition: border-color .15s, color .15s;
+  transition: border-color .15s, background .15s, color .15s;
+  -webkit-tap-highlight-color: transparent;
 }
-.limpar:hover { border-color: var(--tinta-3); color: var(--tinta); }
-.limpar:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.bt:hover { border-color: var(--tinta-3); color: var(--tinta); }
+.bt[aria-pressed="true"] { background: var(--acento-eco); border-color: var(--acento); color: var(--acento); }
+.bt:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.bt svg { width: 14px; height: 14px; }
+.bt.so-icone { padding: 0; width: 34px; }
+.bt.fim { margin-left: auto; }
 
-.dica { font-size: 12.5px; color: var(--tinta-3); }
+.faixa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--regua-2);
+}
+.espessuras { display: inline-flex; gap: 4px; }
+.espessuras .bt { height: 28px; padding: 0 10px; font-size: 12px; }
 
-/* miniatura da entrada do modelo --------------------------- */
-.entrada {
-  margin-left: auto;
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+.chip {
+  appearance: none;
+  width: 32px; height: 30px;
+  border: 1px solid var(--regua);
+  border-radius: 6px;
+  background: var(--carta);
+  color: var(--tinta-2);
+  font: 500 13px/1 'JetBrains Mono', monospace;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.chip:hover { background: var(--acento-eco); border-color: var(--acento); color: var(--acento); }
+
+/* ── previsão ── */
+.veredito {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 16px;
+  padding: 16px;
+  margin-bottom: 4px;
+  background: var(--recuo);
+  border: 1px solid var(--regua-2);
+  border-radius: 7px;
 }
-#tela28 {
-  width: 38px; height: 38px;
-  border: 1px solid var(--regua);
-  border-radius: 2px;
+.pilula {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 999px;
   background: var(--carta);
-  image-rendering: pixelated;
-  display: block;
-}
-.entrada span { font-size: 11px; line-height: 1.3; color: var(--tinta-3); max-width: 76px; }
-
-/* leitura -------------------------------------------------- */
-.digito {
-  font: 400 132px/.86 'Instrument Serif', Georgia, serif;
-  letter-spacing: -.02em;
-  min-height: 114px;
-}
-.digito.vazio { color: var(--regua); }
-
-.certeza {
-  margin-top: 10px;
-  font-size: 14px;
+  border: 1px solid var(--regua);
+  font-size: 12.5px;
   color: var(--tinta-2);
-  min-height: 22px;
 }
-.certeza b { color: var(--tinta); font-weight: 600; font-variant-numeric: tabular-nums; }
+.pilula i { width: 6px; height: 6px; border-radius: 50%; background: var(--tinta-3); }
+.pilula[data-ativa="sim"] { background: var(--acento-eco); border-color: #cadfd9; color: var(--acento); font-weight: 500; }
+.pilula[data-ativa="sim"] i { background: var(--acento); }
+.frase { margin: 9px 0 0; font-size: 12.5px; color: var(--tinta-3); }
 
-.barras { margin-top: 26px; border-top: 1px solid var(--regua); padding-top: 16px; }
+.numeral {
+  margin-left: auto;
+  font: 400 76px/.8 'Instrument Serif', Georgia, serif;
+  color: var(--tinta);
+}
+.numeral.vazio { color: var(--regua); }
+
+/* ── barras ── */
+.cabecalho-barras {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 58px;
+  gap: 12px;
+  padding: 14px 2px 8px;
+  border-bottom: 1px solid var(--regua-2);
+}
+.cabecalho-barras :last-child { text-align: right; }
 
 .linha {
   display: grid;
-  grid-template-columns: 13px minmax(0, 1fr) 46px;
+  grid-template-columns: 22px minmax(0, 1fr) 58px;
   align-items: center;
   gap: 12px;
-  padding: 5px 0;
+  padding: 6px 2px;
+  border-radius: 5px;
+  transition: background .18s;
 }
-.linha .d {
-  font-size: 12.5px;
-  color: var(--tinta-3);
-  font-variant-numeric: tabular-nums;
-}
-.trilha { height: 5px; border-radius: 3px; background: var(--trilho); overflow: hidden; }
+.linha[data-topo="sim"] { background: var(--acento-eco); }
+.linha .d { font: 400 12.5px/1 'JetBrains Mono', monospace; color: var(--tinta-3); text-align: center; }
+.linha[data-topo="sim"] .d { color: var(--acento); font-weight: 500; }
+.trilha { height: 6px; border-radius: 3px; background: var(--regua-2); overflow: hidden; }
 .fill {
   display: block;
   height: 100%;
@@ -187,23 +262,38 @@ main { flex: 1; }
   background: var(--tinta-3);
   transition: width .3s cubic-bezier(.2,.8,.3,1), background .2s;
 }
-.linha .pct {
+.linha[data-topo="sim"] .fill { background: var(--acento); }
+.linha .pct { font: 400 12px/1 'JetBrains Mono', monospace; color: var(--tinta-3); text-align: right; font-variant-numeric: tabular-nums; }
+.linha[data-topo="sim"] .pct { color: var(--acento); font-weight: 500; }
+
+.rodape-carta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--regua-2);
   font-size: 12px;
   color: var(--tinta-3);
-  text-align: right;
-  font-variant-numeric: tabular-nums;
 }
-.linha[data-topo="sim"] .d   { color: var(--tinta); font-weight: 600; }
-.linha[data-topo="sim"] .fill { background: var(--acento); }
-.linha[data-topo="sim"] .pct { color: var(--tinta); font-weight: 500; }
+.rodape-carta .entrada { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+#tela28 {
+  width: 34px; height: 34px;
+  border: 1px solid var(--regua);
+  border-radius: 4px;
+  background: var(--recuo);
+  image-rendering: pixelated;
+  display: block;
+}
 
-/* ── rodapé ──────────────────────────────────────────────── */
-footer { margin-top: 54px; padding-bottom: 40px; }
-footer .risco { margin-bottom: 16px; }
+/* ═══════════════════════════ rodapé ═══════════════════════════ */
+footer { margin-top: 22px; padding-bottom: 36px; }
 .notas {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--regua);
   font-size: 12.5px;
   color: var(--tinta-3);
 }
@@ -212,23 +302,22 @@ footer .risco { margin-bottom: 16px; }
 .notas a:hover { color: var(--tinta); border-color: var(--tinta-3); }
 .notas .fim { margin-left: auto; }
 
-/* ── responsivo ──────────────────────────────────────────── */
-@media (max-width: 620px) {
-  .folha { padding: 0 20px; }
-  .mesa { grid-template-columns: 1fr; gap: 30px; }
-  /* em coluna única o canvas não pode crescer até empurrar a previsão
-     para fora da tela */
-  .prancheta { max-width: 380px; }
-  .digito { font-size: 104px; min-height: 90px; }
-  header { padding-top: 26px; }
-  .sub { display: none; }
+/* ═══════════════════════════ responsivo ═══════════════════════════ */
+@media (max-width: 780px) {
+  .mesa { grid-template-columns: 1fr; }
+  .prancheta { max-width: 400px; }
+  .numeral { font-size: 64px; }
+}
+@media (max-width: 480px) {
+  .folha { padding: 0 16px; }
+  .legenda { display: none; }
+  /* só caneta e borracha viram ícone. "Limpar" é exigência do enunciado e
+     mantém o rótulo; os botões de espessura precisam do texto para
+     significar alguma coisa */
+  #fer-caneta span, #fer-borracha span { display: none; }
+  #fer-caneta, #fer-borracha { padding: 0; width: 34px; }
   .notas .fim { margin-left: 0; }
 }
-
-@media (max-width: 560px) {
-  .dica { display: none; }   /* some antes de espremer o resto da linha */
-}
-
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: .001ms !important; }
 }
@@ -240,51 +329,112 @@ footer .risco { margin-bottom: 16px; }
 <div class="folha">
   <header>
     <span class="marca">digits<em>-</em>28</span>
-    <span class="sub" id="estado">carregando o modelo…</span>
+    <span class="legenda">CNN treinada no MNIST, rodando no seu navegador</span>
+    <span class="selo" id="selo" data-pronto="nao"><i></i><span id="selo-txt">carregando o modelo</span></span>
   </header>
-  <div class="risco"></div>
 </div>
 
 <main class="folha">
   <div class="mesa">
 
-    <section>
-      <p class="chamada">Desenhe um dígito de 0 a 9.</p>
-
-      <div class="prancheta" id="prancheta" data-usada="nao">
-        <canvas id="tela"></canvas>
-        <div class="fantasma">o traço aparece aqui</div>
+    <!-- ── quadro ─────────────────────────────────────────────── -->
+    <section class="carta">
+      <div class="carta-topo">
+        <span class="rotulo">Quadro de desenho</span>
+        <span class="rotulo" style="margin-left:auto">mouse · dedo · caneta</span>
       </div>
+      <div class="carta-corpo">
 
-      <div class="pe">
-        <button class="limpar" id="limpar">Limpar</button>
-        <span class="dica">mouse, dedo ou caneta</span>
-        <span class="entrada">
-          <canvas id="tela28" width="28" height="28" aria-label="Entrada 28×28 enviada ao modelo"></canvas>
-          <span>entrada do modelo</span>
-        </span>
+        <div class="prancheta" id="prancheta" data-usada="nao">
+          <canvas id="tela"></canvas>
+          <div class="fantasma">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.6 7.6"/><circle cx="11" cy="11" r="2"/>
+            </svg>
+            <span>desenhe um dígito de 0 a 9</span>
+          </div>
+        </div>
+
+        <div class="ferramentas">
+          <button class="bt" id="fer-caneta" aria-pressed="true" title="Caneta (P)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+            <span>Caneta</span>
+          </button>
+          <button class="bt" id="fer-borracha" aria-pressed="false" title="Borracha (E)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H8.5L3 14.5a2 2 0 0 1 0-2.8l7.7-7.7a2 2 0 0 1 2.8 0l6 6a2 2 0 0 1 0 2.8L13 20"/><path d="M7 10l7 7"/></svg>
+            <span>Borracha</span>
+          </button>
+          <button class="bt so-icone fim" id="desfazer" title="Desfazer (Ctrl+Z)" aria-label="Desfazer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3.5 13a9 9 0 1 0 2.6-6.4L3 9.5"/></svg>
+          </button>
+          <button class="bt" id="limpar" title="Limpar (C)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+            <span>Limpar</span>
+          </button>
+        </div>
+
+        <div class="faixa">
+          <span class="rotulo">Espessura</span>
+          <span class="espessuras" role="group" aria-label="Espessura do traço">
+            <button class="bt esp" data-esp="0.050" aria-pressed="false">Fino</button>
+            <button class="bt esp" data-esp="0.075" aria-pressed="true">Médio</button>
+            <button class="bt esp" data-esp="0.105" aria-pressed="false">Grosso</button>
+          </span>
+        </div>
+
+        <div class="faixa" style="border:0;padding-top:4px">
+          <span class="rotulo">Exemplos</span>
+          <span class="rotulo" style="margin-left:auto">clique ou digite 0–9</span>
+        </div>
+        <div class="chips" id="chips"></div>
+
       </div>
     </section>
 
-    <section aria-live="polite">
-      <div class="digito vazio" id="digito">—</div>
-      <div class="certeza" id="certeza"></div>
+    <!-- ── previsão ───────────────────────────────────────────── -->
+    <section class="carta" aria-live="polite">
+      <div class="carta-topo">
+        <span class="rotulo">Previsão</span>
+        <span class="rotulo mono" id="latencia" style="margin-left:auto">—</span>
+      </div>
+      <div class="carta-corpo">
 
-      <div class="barras" id="barras"></div>
+        <div class="veredito">
+          <div>
+            <span class="pilula" id="pilula" data-ativa="nao"><i></i><span id="pilula-txt">aguardando traço</span></span>
+            <p class="frase" id="frase">desenhe no quadro ao lado</p>
+          </div>
+          <div class="numeral vazio" id="numeral">—</div>
+        </div>
+
+        <div class="cabecalho-barras">
+          <span></span>
+          <span class="rotulo">Distribuição por dígito</span>
+          <span class="rotulo">Probab.</span>
+        </div>
+
+        <div id="barras"></div>
+
+        <div class="rodape-carta">
+          <span>roda sem servidor depois de carregada</span>
+          <span class="entrada">
+            <canvas id="tela28" width="28" height="28" aria-label="Entrada 28×28 enviada ao modelo"></canvas>
+            <span class="rotulo">entrada<br />28×28</span>
+          </span>
+        </div>
+
+      </div>
     </section>
 
   </div>
 </main>
 
 <footer class="folha">
-  <div class="risco"></div>
   <div class="notas">
     <span><b id="n-acuracia">—</b> de acurácia no MNIST</span>
     <span><b id="n-params">—</b> parâmetros</span>
     <span><b id="n-peso">—</b> baixados uma vez</span>
-    <span class="fim">
-      <a href="https://github.com/hugbrl09/digits-28" target="_blank" rel="noopener">relatório e código no GitHub</a>
-    </span>
+    <span class="fim"><a href="https://github.com/hugbrl09/digits-28" target="_blank" rel="noopener">relatório e código no GitHub</a></span>
   </div>
 </footer>
 
@@ -296,14 +446,15 @@ footer .risco { margin-bottom: 16px; }
    ════════════════════════════════════════════════════════════════════ */
 
 const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
 const limitar = (v, a, b) => Math.min(b, Math.max(a, v));
 const nBR = (v, d = 0) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
 
-/* ── telas ─────────────────────────────────────────────────────────
+/* ── telas ──────────────────────────────────────────────────────────
    Duas telas. A visível é tinta escura sobre papel, porque é o que
-   parece natural desenhar. A que o modelo lê é branca sobre preta, que
-   é o formato do MNIST. Separar as duas evita que qualquer escolha
-   visual acabe entrando no tensor.                                   */
+   parece natural desenhar. A que o modelo lê é branca sobre preta, o
+   formato do MNIST. Separar as duas evita que qualquer escolha visual
+   acabe entrando no tensor.                                          */
 const TINTA_N = 280;
 
 const telaVis = $('#tela');
@@ -315,9 +466,10 @@ const ctxTinta = telaTinta.getContext('2d', { willReadFrequently: true });
 
 const ctx28 = $('#tela28').getContext('2d');
 
-let tracos = [];          // coordenadas normalizadas 0..1: sobrevivem a redimensionamento
+let tracos = [];            // {ferramenta, espessura, pts} em coordenadas 0..1
 let tracoAtual = null;
-const ESPESSURA = 0.075;
+let espessura = 0.075;
+let ferramenta = 'caneta';
 
 function ajustarTela() {
   const r = telaVis.getBoundingClientRect();
@@ -337,7 +489,7 @@ function tracarCaminho(ctx, pts, escala) {
     return;
   }
   ctx.moveTo(pts[0].x * escala, pts[0].y * escala);
-  // curva pelos pontos médios: suaviza o traço sem deformá-lo
+  // curva pelos pontos médios: suaviza sem deformar o traço
   for (let i = 1; i < pts.length - 1; i++) {
     ctx.quadraticCurveTo(
       pts[i].x * escala, pts[i].y * escala,
@@ -353,21 +505,23 @@ function desenharVisivel() {
   const L = telaVis.width;
   ctxVis.clearRect(0, 0, L, L);
   ctxVis.lineCap = ctxVis.lineJoin = 'round';
-  ctxVis.strokeStyle = '#1c1b18';
   for (const t of tracos) {
-    ctxVis.lineWidth = ESPESSURA * L;
-    tracarCaminho(ctxVis, t, L);
+    ctxVis.lineWidth = t.espessura * L;
+    ctxVis.globalCompositeOperation = t.ferramenta === 'borracha' ? 'destination-out' : 'source-over';
+    ctxVis.strokeStyle = '#1b1a17';
+    tracarCaminho(ctxVis, t.pts, L);
   }
+  ctxVis.globalCompositeOperation = 'source-over';
 }
 
 function desenharTinta() {
   ctxTinta.fillStyle = '#000';
   ctxTinta.fillRect(0, 0, TINTA_N, TINTA_N);
   ctxTinta.lineCap = ctxTinta.lineJoin = 'round';
-  ctxTinta.strokeStyle = '#fff';
   for (const t of tracos) {
-    ctxTinta.lineWidth = ESPESSURA * TINTA_N;
-    tracarCaminho(ctxTinta, t, TINTA_N);
+    ctxTinta.lineWidth = t.espessura * TINTA_N;
+    ctxTinta.strokeStyle = t.ferramenta === 'borracha' ? '#000' : '#fff';
+    tracarCaminho(ctxTinta, t.pts, TINTA_N);
   }
 }
 
@@ -388,7 +542,11 @@ function posicao(ev) {
 prancheta.addEventListener('pointerdown', (ev) => {
   if (ev.button) return;
   prancheta.setPointerCapture(ev.pointerId);
-  tracoAtual = [posicao(ev)];
+  tracoAtual = {
+    ferramenta,
+    espessura: ferramenta === 'borracha' ? espessura * 1.7 : espessura,
+    pts: [posicao(ev)],
+  };
   tracos.push(tracoAtual);
   redesenhar();
   agendar();
@@ -397,9 +555,9 @@ prancheta.addEventListener('pointerdown', (ev) => {
 prancheta.addEventListener('pointermove', (ev) => {
   if (!tracoAtual) return;
   const p = posicao(ev);
-  const u = tracoAtual[tracoAtual.length - 1];
+  const u = tracoAtual.pts[tracoAtual.pts.length - 1];
   if (Math.hypot(p.x - u.x, p.y - u.y) < 0.004) return;   // descarta tremor
-  tracoAtual.push(p);
+  tracoAtual.pts.push(p);
   redesenhar();
   agendar();
 });
@@ -413,13 +571,33 @@ prancheta.addEventListener('pointerup', soltar);
 prancheta.addEventListener('pointercancel', soltar);
 prancheta.addEventListener('pointerleave', soltar);
 
+/* ── ferramentas ──────────────────────────────────────────────────── */
+function definirFerramenta(nome) {
+  ferramenta = nome;
+  $('#fer-caneta').setAttribute('aria-pressed', String(nome === 'caneta'));
+  $('#fer-borracha').setAttribute('aria-pressed', String(nome === 'borracha'));
+}
+$('#fer-caneta').addEventListener('click', () => definirFerramenta('caneta'));
+$('#fer-borracha').addEventListener('click', () => definirFerramenta('borracha'));
+
+$$('.esp').forEach((b) => b.addEventListener('click', () => {
+  espessura = parseFloat(b.dataset.esp);
+  $$('.esp').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+}));
+
 function limpar() {
   tracos = [];
   tracoAtual = null;
   redesenhar();
   zerar();
 }
+function desfazer() {
+  tracos.pop();
+  redesenhar();
+  tracos.length ? prever() : zerar();
+}
 $('#limpar').addEventListener('click', limpar);
+$('#desfazer').addEventListener('click', desfazer);
 
 /* ── pré-processamento no padrão MNIST ────────────────────────────────
    O MNIST não guarda o dígito como a pessoa desenhou: cada imagem foi
@@ -521,10 +699,13 @@ async function carregar() {
   try {
     modelo = await tf.loadLayersModel('modelo_web/model.json');
     tf.tidy(() => modelo.predict(tf.zeros([1, 28, 28, 1])).dataSync());   // aquece os shaders
-    $('#estado').textContent = '';
+    $('#selo').dataset.pronto = 'sim';
+    $('#selo-txt').textContent = 'modelo ativo';
   } catch (erro) {
     console.error(erro);
-    $('#estado').textContent = 'modelo não encontrado';
+    $('#selo').dataset.pronto = 'erro';
+    $('#selo-txt').textContent = 'modelo não encontrado';
+    $('#frase').textContent = 'publique modelo_web/ para ativar a previsão';
   }
 }
 
@@ -547,9 +728,9 @@ function prever() {
 
   pintar28(grade);
   ultima = performance.now();
-
+  const t0 = performance.now();
   const p = tf.tidy(() => modelo.predict(tf.tensor4d(grade, [1, 28, 28, 1]).div(255)).dataSync());
-  mostrar(p);
+  mostrar(p, performance.now() - t0);
 }
 
 /* ── leitura ──────────────────────────────────────────────────────── */
@@ -560,22 +741,29 @@ $('#barras').innerHTML = Array.from({ length: 10 }, (_, d) => `
     <span class="pct" id="p${d}">0,0%</span>
   </div>`).join('');
 
+$('#chips').innerHTML = Array.from({ length: 10 }, (_, d) =>
+  `<button class="chip" data-d="${d}" title="Desenhar um ${d}">${d}</button>`).join('');
+
 function zerar() {
   for (let d = 0; d < 10; d++) {
     $('#f' + d).style.width = '0%';
     $('#p' + d).textContent = '0,0%';
     $('#l' + d).dataset.topo = 'nao';
   }
-  const dig = $('#digito');
-  dig.textContent = '—';
-  dig.classList.add('vazio');
-  $('#certeza').textContent = '';
+  const num = $('#numeral');
+  num.textContent = '—';
+  num.classList.add('vazio');
+  $('#pilula').dataset.ativa = 'nao';
+  $('#pilula-txt').textContent = 'aguardando traço';
+  if (modelo) $('#frase').textContent = 'desenhe no quadro ao lado';
+  $('#latencia').textContent = '—';
   pintar28(null);
 }
 
-function mostrar(p) {
-  let topo = 0;
+function mostrar(p, ms) {
+  let topo = 0, vice = -1;
   for (let d = 1; d < 10; d++) if (p[d] > p[topo]) topo = d;
+  for (let d = 0; d < 10; d++) if (d !== topo && (vice < 0 || p[d] > p[vice])) vice = d;
 
   for (let d = 0; d < 10; d++) {
     $('#f' + d).style.width = (p[d] * 100).toFixed(2) + '%';
@@ -583,13 +771,16 @@ function mostrar(p) {
     $('#l' + d).dataset.topo = d === topo ? 'sim' : 'nao';
   }
 
-  const dig = $('#digito');
-  dig.textContent = String(topo);
-  dig.classList.remove('vazio');
-  $('#certeza').innerHTML = `<b>${nBR(p[topo] * 100, 1)}%</b> de certeza`;
+  const num = $('#numeral');
+  num.textContent = String(topo);
+  num.classList.remove('vazio');
+  $('#pilula').dataset.ativa = 'sim';
+  $('#pilula-txt').textContent = nBR(p[topo] * 100, 1) + '% de certeza';
+  $('#frase').textContent = `segunda hipótese: ${vice}, com ${nBR(p[vice] * 100, 1)}%`;
+  $('#latencia').textContent = ms < 1 ? '< 1 ms' : `${nBR(ms, ms < 10 ? 1 : 0)} ms`;
 }
 
-/* ── exemplos pelas teclas 0–9 ────────────────────────────────────── */
+/* ── exemplos ─────────────────────────────────────────────────────── */
 function arco(cx, cy, rx, ry, g0, g1, n) {
   const pts = [];
   for (let i = 0; i <= n; i++) {
@@ -613,21 +804,31 @@ const EXEMPLOS = {
   9: [[...arco(0.505, 0.375, 0.125, 0.135, 20, 380, 26), ...reta([0.628, 0.395], [0.575, 0.785])]],
 };
 
+function desenharExemplo(d) {
+  const receita = EXEMPLOS[d];
+  if (!receita) return;
+  tracos = receita.map((pts) => ({ ferramenta: 'caneta', espessura: 0.072, pts: pts.slice() }));
+  redesenhar();
+  prever();
+}
+
+$('#chips').addEventListener('click', (ev) => {
+  const chip = ev.target.closest('.chip');
+  if (chip) desenharExemplo(Number(chip.dataset.d));
+});
+
 addEventListener('keydown', (ev) => {
-  if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
   const alvo = ev.target;
   if (alvo && (alvo.tagName === 'INPUT' || alvo.isContentEditable)) return;
 
-  const k = ev.key;
-  if (k >= '0' && k <= '9') {
-    ev.preventDefault();
-    tracos = EXEMPLOS[k].map((pts) => pts.slice());
-    redesenhar();
-    prever();
-  } else if (k === 'Escape' || k === 'Delete' || k === 'Backspace' || k.toLowerCase() === 'c') {
-    ev.preventDefault();
-    limpar();
-  }
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); desfazer(); return; }
+  if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+
+  const k = ev.key.toLowerCase();
+  if (k >= '0' && k <= '9') { ev.preventDefault(); desenharExemplo(Number(k)); }
+  else if (k === 'c' || ev.key === 'Delete' || ev.key === 'Backspace' || ev.key === 'Escape') { ev.preventDefault(); limpar(); }
+  else if (k === 'e') definirFerramenta('borracha');
+  else if (k === 'p' || k === 'b') definirFerramenta('caneta');
 });
 
 /* ── partida ──────────────────────────────────────────────────────── */
