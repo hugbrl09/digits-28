@@ -1,127 +1,187 @@
-# 🧠 Reconhecedor de Dígitos MNIST no Navegador (TensorFlow.js)
+# digits-28
 
-<p align="center">
-  <img src="https://img.shields.io/badge/TensorFlow.js-4.22.0-FF6F00?style=for-the-badge&logo=tensorflow&logoColor=white" alt="TensorFlow.js" />
-  <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
-  <img src="https://img.shields.io/badge/TailwindCSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind CSS" />
-  <img src="https://img.shields.io/badge/Status-100%25%20Offline-10B981?style=for-the-badge" alt="Offline" />
-</p>
+Uma rede convolucional treinada no MNIST que reconhece dígitos manuscritos **dentro do navegador**. Depois que a página carrega, não existe servidor, requisição nem internet no caminho: o modelo roda no dispositivo de quem abriu.
 
-Aplicação web interativa para reconhecimento de dígitos manuscritos (**0 a 9**) em tempo real. O modelo de **Rede Neural Convolucional (CNN)** é treinado em Python, exportado para formato web e executado **100% no navegador do usuário via TensorFlow.js**, sem necessidade de backend, API ou conexão com a internet após o carregamento da página.
+**Página:** https://hugbrl09.github.io/digits-28/
+
+**99,59%** de acurácia no conjunto de teste · **289.130** parâmetros · **1,1 MB** baixados uma única vez.
 
 ---
 
-## ✨ Principais Funcionalidades
+## Parte 1 · Treinar
 
-* ✍️ **Quadro de Desenho Interativo**: Canvas responsivo de alta precisão com suporte completo a mouse, trackpad e telas de toque (*touchscreen* em celulares e tablets).
-* 🎯 **Auto-Centralização por Bounding Box (Padrão MNIST)**: Algoritmo de pré-processamento que recorta a caixa delimitadora do traço desenhado e o redimensiona/centraliza em uma área 20×20 dentro da grade 28×28, garantindo alta acurácia mesmo para desenhos pequenos ou fora do centro.
-* ⚡ **Inferência em Tempo Real com Zero Latência**: Classificação contínua a cada traço (< 5 ms de tempo de inferência via WebGL/Wasm).
-* 📊 **Distribuição das 10 Probabilidades**: Gráfico com barras animadas exibindo a porcentagem de certeza do modelo para cada dígito de 0 a 9.
-* 🔍 **Diagnóstico de Confusão (Top-2)**: Análise inteligente que compara a probabilidade do 1º colocado com o 2º colocado mais próximo para identificar casos de ambiguidade (ex: 4 vs 9, 3 vs 8, 7 vs 1).
-* 🎛️ **Barra de Ferramentas Completa**: Alternância entre **Caneta** (*Pen*), **Borracha** (*Eraser*), seletor de espessuras (*Fino*, *Médio*, *Grosso*) e **Desfazer** (*Undo*) com histórico de até 25 estados.
-* 🔢 **Chips de Teste Rápido (0 a 9)**: Botões para preenchimento instantâneo de dígitos sintéticos para testes rápidos do modelo.
-* ⌨️ **Atalhos Globais de Teclado**: Suporte a comandos rápidos no desktop.
+MNIST completo: 60.000 imagens de treino e 10.000 de teste.
 
----
-
-## ⌨️ Atalhos de Teclado
-
-| Tecla / Atalho | Ação |
-| :--- | :--- |
-| <kbd>Ctrl</kbd> + <kbd>Z</kbd> ou <kbd>Cmd</kbd> + <kbd>Z</kbd> | **Desfazer** o último traço |
-| <kbd>C</kbd> ou <kbd>Delete</kbd> / <kbd>Backspace</kbd> | **Limpar** todo o quadro |
-| <kbd>P</kbd> ou <kbd>B</kbd> | Selecionar a **Caneta** (*Pen / Brush*) |
-| <kbd>E</kbd> | Selecionar a **Borracha** (*Eraser*) |
-| <kbd>0</kbd> a <kbd>9</kbd> | Desenhar instantaneamente o exemplo do número |
-
----
-
-## 🧠 Arquitetura da Rede Neural (CNN)
-
-A rede convolucional foi projetada para equilibrar **alta acurácia (>99%)** com **baixo tamanho de download (~1.2 MB)** para execução instantânea no navegador:
-
-```mermaid
-graph TD
-    A["Entrada: 28 × 28 × 1 (Escala de Cinza Normalizada)"] --> B["Conv2D (32 filtros, 3×3, ReLU, padding='same')"]
-    B --> C["MaxPooling2D (2×2)"]
-    C --> D["Conv2D (64 filtros, 3×3, ReLU, padding='same')"]
-    D --> E["MaxPooling2D (2×2)"]
-    E --> F["Flatten"]
-    F --> G["Dense (128 neurônios, ReLU) + Dropout(0.25)"]
-    G --> H["Dense (10 classes, Softmax)"]
+```
+Entrada 28 × 28 × 1
+│
+├─ Bloco 1   Conv 32 (3×3) → Conv 32 (3×3) → BatchNorm → MaxPool → Dropout 0,25   28×28 → 14×14
+├─ Bloco 2   Conv 64 (3×3) → Conv 64 (3×3) → BatchNorm → MaxPool → Dropout 0,25   14×14 →  7×7
+├─ Bloco 3   Conv 128 (3×3)                → BatchNorm → MaxPool → Dropout 0,25    7×7  →  3×3
+│
+└─ Flatten (1152) → Dense 128 → BatchNorm → Dropout 0,4 → Dense 10 (softmax)
 ```
 
-### Detalhes do Treinamento:
-* **Dataset**: MNIST Completo (60.000 imagens de treino / 10.000 de teste).
-* **Função de Perda**: `sparse_categorical_crossentropy`
-* **Otimizador**: `Adam(learning_rate=0.001)`
-* **Callbacks**: `EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)`
-* **Acurácia de Teste**: ~99.2%
+| Requisito | Onde está |
+|---|---|
+| entrada 28 × 28 × 1 | `keras.Input(shape=(28, 28, 1))` |
+| pelo menos duas camadas convolucionais | cinco: `conv1a`, `conv1b`, `conv2a`, `conv2b`, `conv3a` |
+| saída `Dense(10, activation='softmax')` | camada `saida` |
+| perda `sparse_categorical_crossentropy` | no `compile()` |
+| `EarlyStopping` com `restore_best_weights=True` | `patience=6`, monitorando `val_loss` |
+
+### Justificativa da arquitetura
+
+**Duas convoluções antes de cada pooling.** Duas 3×3 empilhadas cobrem a mesma região que uma 5×5, com menos parâmetros e uma não-linearidade a mais no meio. Traço manuscrito é feito de bordas e curvas curtas — profundidade barata rende mais do que filtro largo.
+
+**Filtros dobrando a cada bloco.** Cada pooling corta a resolução pela metade. Dobrar os canais compensa a perda espacial, deslocando a representação de *onde* está a borda para *que tipo* de traço ela é.
+
+**BatchNormalization.** Normalizar as ativações dentro do bloco estabiliza o gradiente e permite uma taxa de aprendizado maior sem divergir. É o que faz a rede passar de 88% para mais de 99% em poucas épocas.
+
+**Dropout crescente (0,25 → 0,4).** As convoluções já são regularizadas pelo compartilhamento de pesos; a densa de 128 unidades é a que mais decora, então o dropout mais forte fica onde está o risco.
+
+**Mapa de 3×3×128 antes do `Flatten`.** Chegar a um mapa espacial pequeno antes de achatar mantém a camada densa em 147 mil parâmetros em vez de 400 mil. O modelo inteiro fica em 1,1 MB — e esse arquivo é baixado por quem abre a página, então tamanho aqui é experiência de uso.
+
+### Duas decisões que o enunciado não pedia
+
+**A validação sai do treino, não do teste.** O `EarlyStopping` precisa de um conjunto para decidir quando parar. Usar os 10.000 exemplos de teste para isso vazaria informação e inflaria a acurácia reportada. O notebook separa 6.000 imagens do próprio treino para validação e só toca no teste na Parte 2.
+
+**Aumento de dados, aplicado fora do modelo.** Rotação ±14°, translação ±10% e zoom ±10%. O MNIST tem dígitos já centralizados e normalizados; quem usa a página desenha torto, deslocado e com espessura variável. As camadas de aumento vivem no `tf.data`, não dentro da rede — assim o modelo exportado carrega só o que a inferência precisa.
 
 ---
 
-## 📁 Estrutura do Projeto
+## Parte 2 · Avaliar antes de exportar
 
-O código-fonte segue a separação limpa de responsabilidades:
+Medido sobre os 10.000 exemplos de teste, que não foram usados em nenhum momento do treino.
 
-```text
-digits-28/
-├── 📄 index.html            # Estrutura semântica da aplicação web
-├── 🎨 style.css             # Folha de estilos, fontes e gradientes
-├── ⚡ app.js                # Lógica do Canvas, Bounding Box e TFJS
-├── 🐍 treinar_mnist.py      # Pipeline completo de treino, avaliação e matriz de confusão
-├── 🔧 converter_standalone.py # Conversor de modelo Keras 3 para formato TensorFlow.js
-├── 📁 modelo_web/           # Modelo exportado pronto para o browser
-│   ├── 📄 model.json        # Topologia e arquitetura das camadas
-│   └── 📦 group1-shard1of1.bin # Pesos binários da rede
-├── 📄 .gitignore            # Arquivos ignorados pelo Git
-└── 📄 README.md             # Documentação do projeto
-```
+| | |
+|---|---|
+| **Acurácia no teste** | **99,59%** |
+| Perda no teste | 0,0104 |
+| Erros | 41 de 10000 |
+| Épocas executadas | 36 (melhor: 30) |
+| Treinado em | Tesla T4, TensorFlow 2.20.0 |
+
+### Matriz de confusão 10 × 10
+
+Linha = rótulo verdadeiro, coluna = previsão do modelo. A diagonal em negrito são os acertos; `·` é ausência de erro.
+
+| real \ previsto | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **0** | **979** | · | · | 1 | · | · | · | · | · | · |
+| **1** | · | **1131** | · | 1 | · | · | 1 | 2 | · | · |
+| **2** | · | · | **1027** | 1 | · | · | · | 3 | 1 | · |
+| **3** | · | · | · | **1009** | · | 1 | · | · | · | · |
+| **4** | · | 1 | · | · | **979** | · | · | · | · | 2 |
+| **5** | · | · | · | 3 | · | **887** | 2 | · | · | · |
+| **6** | 1 | 3 | · | · | 1 | 1 | **949** | · | 3 | · |
+| **7** | · | 1 | 2 | · | · | · | · | **1025** | · | · |
+| **8** | 1 | 1 | · | 1 | · | 1 | · | · | **970** | · |
+| **9** | · | · | · | · | 5 | · | · | · | 1 | **1003** |
+
+### Os dois dígitos que o modelo mais confunde entre si
+
+**4 ↔ 9**, com **7 erros** somando os dois sentidos: 2 imagens do 4 lidas como 9, e 5 do 9 lidas como 4.
+
+É o par clássico do MNIST — manuscrito, a distância entre um 4 de topo fechado e um 9 de perna reta é de poucos pixels. E é exatamente o tipo de coisa que a acurácia sozinha esconde: 99,59% não diz *onde* o modelo erra, a matriz diz.
+
+Os cinco pares mais confundidos:
+
+| par | erros somando os dois sentidos |
+|---|---|
+| 4 ↔ 9 | 7 |
+| 2 ↔ 7 | 5 |
+| 1 ↔ 6 | 4 |
+| 3 ↔ 5 | 4 |
+| 1 ↔ 7 | 3 |
+
+### Três imagens que ele errou
+
+<img src="relatorio/erro-1.png" width="96" alt="dígito 4 classificado como 9" />
+<img src="relatorio/erro-2.png" width="96" alt="dígito 5 classificado como 6" />
+<img src="relatorio/erro-3.png" width="96" alt="dígito 2 classificado como 7" />
+
+**1.** previu **9**, era **4** (99,9% de certeza) · **2.** previu **6**, era **5** (99,6% de certeza) · **3.** previu **7**, era **2** (99,1% de certeza)
+
+São os erros mais confiantes do conjunto: casos em que o modelo errou *e ainda assim* atribuiu alta probabilidade à classe errada. As outras 5 amostras estão no `relatorio.json`.
+
+### Desempenho por classe
+
+| dígito | precisão | revocação | F1 | suporte |
+|---|---|---|---|---|
+| 0 | 99,80% | 99,90% | 99,85% | 980 |
+| 1 | 99,47% | 99,65% | 99,56% | 1135 |
+| 2 | 99,81% | 99,52% | 99,66% | 1032 |
+| 3 | 99,31% | 99,90% | 99,61% | 1010 |
+| 4 | 99,39% | 99,69% | 99,54% | 982 |
+| 5 | 99,66% | 99,44% | 99,55% | 892 |
+| 6 | 99,68% | 99,06% | 99,37% | 958 |
+| 7 | 99,51% | 99,71% | 99,61% | 1028 |
+| 8 | 99,49% | 99,59% | 99,54% | 974 |
+| 9 | 99,80% | 99,41% | 99,60% | 1009 |
+
+O dígito 6 é o de menor revocação (99,06%): três imagens dele foram lidas como 1 e três como 8.
+
+### Curva de aprendizado
+
+O `EarlyStopping` parou na época 36 e restaurou os pesos da época 30.
+
+| | primeira época | melhor época (30) |
+|---|---|---|
+| Acurácia no treino | 88,45% | 99,41% |
+| Acurácia na validação | 88,40% | 99,53% |
+| Perda na validação | 0,4378 | 0,0150 |
+
+> **Nota.** Recalculando a mesma avaliação em CPU, dá 99,60% (40 erros) em vez de 99,59% (41). A diferença é uma única imagem de um `6` cuja margem entre as duas classes candidatas é exatamente `0,00e+00` — a menor de todo o conjunto. A T4 desempata para `8`, a CPU para `6`. É diferença de arredondamento entre kernels, não divergência de pesos. Os números acima são os da execução no Colab.
 
 ---
 
-## 🚀 Como Executar Localmente
+## Parte 3 · Exportar
 
-### Pré-requisitos
-* Python 3.9+ ou Node.js instalado (apenas para servir os arquivos estáticos localmente).
+O notebook tenta duas rotas, nesta ordem:
 
-### 1. Iniciar o Servidor Local
-Como navegadores modernos bloqueiam o carregamento de arquivos `.json` e `.bin` via protocolo local direto (`file://`) por segurança (CORS), execute um servidor HTTP simples na pasta do projeto:
+1. **`tensorflowjs` oficial** — `tfjs.converters.save_keras_model(...)`, o caminho do enunciado.
+2. **Exportador embutido** — o pacote `tensorflowjs` costuma exigir uma versão de TensorFlow diferente da que o Colab traz, e a instalação quebra o runtime com frequência. A função `exportar_tfjs` escreve o mesmo formato `layers-model` direto do Keras 3, sem dependência extra: sanitiza os campos que o Keras 3 emite e o parser do TF.js não conhece (`batch_shape` → `batch_input_shape`, `dtype` como dicionário de política → string) e grava os pesos em float32 nomeados como `<camada>/<peso>`.
 
-```bash
-# Opção A: Com Python (já nativo no sistema)
-python -m http.server 8000
+No treino que gerou este modelo, a rota oficial falhou e o exportador embutido assumiu.
 
-# Opção B: Com Node.js / npx
-npx serve .
-```
+A célula seguinte **confere a exportação**: compara nome e forma de cada tensor de peso do `model.json` com o modelo em memória e valida o tamanho do `.bin` em bytes. Se algo divergir, ela falha em vez de deixar publicar um modelo quebrado.
 
-### 2. Acessar a Aplicação
-Abra o navegador e acesse:
-👉 **`http://localhost:8000`**
+Verificação adicional feita fora do notebook: o `modelo_web/` publicado foi carregado no próprio TensorFlow.js e comparado ao `modelo.keras` sobre imagens reais de teste — **diferença máxima de 3,5 × 10⁻¹⁰**.
 
 ---
 
-## 🏋️‍♂️ Como Treinar o Modelo Novamente (Opcional)
+## Parte 4 · A página
 
-Se desejar alterar a arquitetura da rede neural ou treinar com novos hiperparâmetros:
+`index.html` — um arquivo, sem framework e sem build. As únicas dependências externas são o TensorFlow.js por CDN e as fontes do Google, ambas carregadas junto com a página.
 
-1. Instale as dependências Python:
-   ```bash
-   pip install tensorflow numpy matplotlib seaborn
-   ```
-2. Execute o script de treinamento:
-   ```bash
-   python treinar_mnist.py
-   ```
-3. O script gerará os gráficos da curva de aprendizado, a **Matriz de Confusão 10×10** e exportará automaticamente os arquivos para a pasta `modelo_web/`.
+O que existe na página:
+
+- canvas onde se desenha com **mouse e com o dedo** (Pointer Events cobrem mouse, toque e caneta pelo mesmo caminho de código);
+- **botão para limpar**;
+- **dígito previsto em destaque**;
+- **a confiança de cada uma das 10 classes, em barras**.
+
+A previsão acontece ao vivo, enquanto o traço é feito. As teclas `0`–`9` desenham um dígito de exemplo, útil para testar sem desenhar.
+
+### O pré-processamento
+
+O MNIST não guarda "o dígito como a pessoa desenhou". Cada imagem foi recortada, reescalada para caber numa caixa de 20×20 e recolocada numa grade 28×28 de modo que o **centro de massa** dos pixels caia no meio. Um modelo treinado nisso espera exatamente isso — mandar a tela inteira, com o dígito no canto, é a origem mais comum de erro nesse tipo de projeto.
+
+A página repete o mesmo procedimento antes de cada previsão:
+
+1. rasteriza o traço numa tela auxiliar 280×280, preta com tinta branca;
+2. acha a caixa delimitadora dos pixels com tinta;
+3. reduz o recorte para caber em 20×20 preservando a proporção;
+4. calcula o centro de massa e cola o recorte na grade 28×28 deslocado para que esse ponto caia no centro;
+5. divide por 255 e monta o tensor `[1, 28, 28, 1]`.
+
+A miniatura ao lado do botão *Limpar* mostra o resultado desse processo — é literalmente o que entra na rede.
+
+Dois detalhes que mudam o resultado:
+
+**Duas telas, não uma.** A tela visível é tinta escura sobre papel, porque é o que parece natural desenhar. A tela que o modelo lê é branca sobre preta, o formato do MNIST. Separar as duas evita que qualquer escolha visual acabe entrando no tensor.
+
+**Média por área na redução, não `drawImage`.** Numa redução de ~14×, o reamostrador do navegador descarta pixels e o traço chega picotado à rede, o que muda bastante a previsão. O passo 3 faz a média dos pixels de cada célula de destino — o mesmo que o MNIST fez ao construir o dataset.
 
 ---
-
-## 🛠️ Tecnologias Utilizadas
-
-* **[TensorFlow.js](https://www.tensorflow.org/js)** — Execução de inferência de Deep Learning no navegador.
-* **[HTML5 Canvas API](https://developer.mozilla.org/pt-BR/docs/Web/API/Canvas_API)** — Renderização de traços táteis e pré-processamento de imagem.
-* **[Tailwind CSS](https://tailwindcss.com/)** — Estilização moderna e layout responsivo.
-* **[Lucide Icons](https://lucide.dev/)** — Ícones nítidos e consistentes para interface.
-* **[Keras & TensorFlow (Python)](https://www.tensorflow.org/)** — Treinamento da CNN e avaliação estatística.
