@@ -1,0 +1,12 @@
+# ambientes Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# saidas locais de treino
+entrega.zip
+
+# sistema
+.DS_Store
+Thumbs.db
